@@ -44,6 +44,22 @@ A comprehensive Django-based application for managing prospective client leads. 
          │    │  Table  │  │  Table  │  │    Table    │   │
          │    └─────────┘  └─────────┘  └─────────────┘   │
          └─────────────────────────────────────────────────┘
+                                 │
+         ┌─────────────────────────────────────────────────┐
+         │              Celery Task Queue                 │
+         │    ┌─────────────┐  ┌─────────────┐            │
+         │    │  Workers    │  │  Beat       │            │
+         │    │  (Tasks)    │  │  (Scheduler)│            │
+         │    └─────────────┘  └─────────────┘            │
+         └─────────────────────────────────────────────────┘
+                                 │
+         ┌─────────────────────────────────────────────────┐
+         │              Redis Message Broker              │
+         │    ┌─────────────┐  ┌─────────────┐            │
+         │    │  Queue      │  │  Cache      │            │
+         │    │  (Tasks)    │  │  (Results)  │            │
+         │    └─────────────┘  └─────────────┘            │
+         └─────────────────────────────────────────────────┘
 ```
 
 ## 🛠️ Tech Stack
@@ -52,10 +68,28 @@ A comprehensive Django-based application for managing prospective client leads. 
 - **Database**: PostgreSQL 14
 - **Authentication**: Token-based authentication
 - **File Storage**: Django file handling with secure access
-- **Email**: Django email backend (configurable)
+- **Email**: Custom Django email backend with SSL handling
+- **Task Queue**: Celery with Redis as message broker
+- **Caching**: Redis for task results and general caching
 - **Containerization**: Docker & Docker Compose
 - **Testing**: pytest with Django integration
+- **Monitoring**: Health checks and Flower dashboard
 
+## 🔄 Celery Tasks
+
+The application uses Celery for asynchronous task processing:
+
+- **Email Notifications**: Sends confirmation emails to prospects and notification emails to attorneys
+- **File Processing**: Handles resume file uploads and processing
+- **Scheduled Tasks**: Regular maintenance and cleanup tasks
+
+## 🏥 Health Checks
+
+The application includes health check endpoints for monitoring:
+
+- **API Health**: `http://localhost:8000/health/`
+- **Celery Worker Status**: Available through Flower dashboard
+- **Database Connection**: Monitored through Django's health check system
 
 ## 🔗 API Endpoints
 
@@ -90,6 +124,7 @@ A comprehensive Django-based application for managing prospective client leads. 
 
 - Docker and Docker Compose installed
 - Git
+- Python 3.10 or higher (for local development)
 
 ### Installation
 
@@ -116,6 +151,14 @@ EMAIL_HOST_PASSWORD=your-app-password
 DEFAULT_FROM_EMAIL=noreply@yourcompany.com
 ATTORNEY_EMAIL=attorney@yourcompany.com
 
+# Redis Configuration
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# Celery Configuration
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+
 # Django
 SECRET_KEY=your-very-secure-secret-key-here
 DEBUG=False
@@ -126,19 +169,35 @@ DEBUG=False
 docker-compose up -d
 ```
 
-4. **Run database migrations**
+4. **Verify services are healthy**
+```bash
+curl http://localhost:8000/health/
+```
+
+5. **Run database migrations**
 ```bash
 docker-compose exec web python manage.py migrate
 ```
 
-5. **Create a superuser account**
+6. **Create a superuser account**
 ```bash
 docker-compose exec web python manage.py createsuperuser
 ```
 
-6. **Access the application**
+7. **Start Celery workers**
+```bash
+docker-compose exec web celery -A lead_managment_app worker -l info
+```
+
+8. **Start Celery beat (optional, for scheduled tasks)**
+```bash
+docker-compose exec web celery -A lead_managment_app beat -l info
+```
+
+9. **Access the application**
 - API Base URL: http://localhost:8000/api/
 - Admin Panel: http://localhost:8000/admin/
+- Flower (Celery monitoring): http://localhost:5555/
 
 ## 📚 Usage Guide
 
@@ -257,27 +316,14 @@ docker-compose exec web pytest
 
 ## 📧 Email Configuration
 
-The application sends two types of emails:
+The application uses a custom email backend to handle SSL certificate issues:
 
-1. **Prospect Confirmation**: Sent to the prospect after successful submission
-2. **Attorney Notification**: Sent to the attorney when a new lead is submitted
-
-### Development Setup
-By default, emails are printed to the console. Check the Docker logs:
-```bash
-docker-compose logs web
-```
-
-### Production Setup
-Configure SMTP settings in your environment variables or settings.py:
 ```python
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-email@gmail.com'
-EMAIL_HOST_PASSWORD = 'your-app-password'
+# settings.py
+EMAIL_BACKEND = 'leads.email_backend.CustomEmailBackend'
 ```
+
+This backend automatically handles SSL certificate verification issues that may occur in development environments.
 
 ## 🔒 Security Features
 
@@ -348,4 +394,33 @@ ATTORNEY_EMAIL=attorney@your-domain.com
   "username": "attorney1",
   "email": "attorney1@example.com"
 }
+```
+
+## 🔄 Asynchronous Tasks
+
+The application uses Celery for handling asynchronous tasks:
+
+### Email Tasks
+- Sending confirmation emails to prospects
+- Sending notification emails to attorneys
+- Bulk email operations
+
+### File Processing Tasks
+- Resume/CV processing and validation
+- File format conversion
+- File cleanup operations
+
+### Scheduled Tasks
+- Daily lead status reports
+- Weekly summary emails
+- Database maintenance tasks
+
+### Monitoring Tasks
+- System health checks
+- Performance metrics collection
+- Error reporting
+
+To monitor Celery tasks, you can use Flower:
+```bash
+docker-compose exec web celery -A lead_managment_app flower
 ```

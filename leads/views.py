@@ -2,7 +2,6 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.conf import settings
-from django.core.mail import send_mail
 from django.http import FileResponse
 from .models import Lead
 from .serializers import (
@@ -11,6 +10,7 @@ from .serializers import (
     LeadDetailSerializer,
     LeadStateUpdateSerializer,
 )
+from .tasks import send_lead_confirmation_email, send_lead_notification_email
 
 
 class IsPublicCreateOrIsAuthenticated(permissions.BasePermission):
@@ -37,38 +37,21 @@ class LeadViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         lead = serializer.save()
-        self._send_prospect_email(lead)
-        self._send_attorney_email(lead)
+
+        # self._send_prospect_email(lead
+        # self._send_attorney_email(lead) 
+        # send_prospect_email_task.delay(lead.first_name, lead.email) 
+        # send_attorney_email_task.delay(lead.first_name, lead.last_name, lead.email) 
+
+        #  Celery version
+        lead_name = f"{lead.first_name} {lead.last_name}"
+        send_lead_confirmation_email.delay(lead.email, lead_name)
+        send_lead_notification_email.delay(lead.email, lead_name)
+
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-    def _send_prospect_email(self, lead):
-        subject = 'Thank you for your submission'
-        message = f'Dear {lead.first_name},\n\nThank you for submitting your information. Our team will review your submission and contact you soon.\n\nBest regards,\nThe Team'
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [lead.email],
-            fail_silently=False,
-        )
-
-    def _send_attorney_email(self, lead):
-        subject = 'New Lead Submission'
-        message = (
-            f'A new lead has been submitted:\n\n'
-            f'Name: {lead.first_name} {lead.last_name}\n'
-            f'Email: {lead.email}\n\n'
-            f'Check the internal dashboard for full details.'
-        )
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [settings.ATTORNEY_EMAIL],
-            fail_silently=False,
-        )
 
     @action(detail=True, methods=['get'])
     def resume(self, request, pk=None):
@@ -90,3 +73,5 @@ class LeadViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         return Response({'detail': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+  
