@@ -349,22 +349,3 @@ ATTORNEY_EMAIL=attorney@your-domain.com
   "email": "attorney1@example.com"
 }
 ```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### Database Connection Error
-```bash
-# Check if PostgreSQL container is running
-docker-compose ps
-
-# Check database logs
-docker-compose logs db
-```
-
-#### Permission Denied for File Uploads
-```bash
-# Fix file permissions
-docker-compose exec web chown -R www-data:www-data /app/media/
-```
