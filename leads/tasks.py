@@ -2,7 +2,7 @@ from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
 
-# ... existing code ...
+
 
 @shared_task
 def send_lead_notification_email(lead_email, lead_name):
