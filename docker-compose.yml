@@ -9,34 +9,50 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      - POSTGRES_DB=lead_management
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-lead_management}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - EMAIL_HOST=smtp.gmail.com
-      - EMAIL_PORT=587
-      - EMAIL_USE_TLS=True
-      - EMAIL_HOST_USER=user
-      - EMAIL_HOST_PASSWORD=password
-      - DEFAULT_FROM_EMAIL=mirafzaldevelop@gmail.com
-      - ATTORNEY_EMAIL=mirafzaldevelop@gmail.com
+      - EMAIL_HOST=${EMAIL_HOST:-smtp.gmail.com}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+      - ATTORNEY_EMAIL=${ATTORNEY_EMAIL}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   db:
     image: postgres:14
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_DB=lead_management
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-lead_management}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7
@@ -44,6 +60,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   celery_worker:
     build: .
@@ -51,11 +72,20 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - web
-      - redis
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+    healthcheck:
+      test: ["CMD", "celery", "-A", "lead_managment_app", "inspect", "ping", "-d", "celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   celery_beat:
     build: .
@@ -63,11 +93,20 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - web
-      - redis
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+    healthcheck:
+      test: ["CMD", "celery", "-A", "lead_managment_app", "inspect", "ping", "-d", "celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   flower:
     build: .
@@ -75,12 +114,22 @@ services:
     ports:
       - "5555:5555"
     depends_on:
-      - web
-      - redis
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG:-False}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data:
   redis_data:
+  

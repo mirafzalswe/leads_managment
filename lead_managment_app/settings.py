@@ -14,6 +14,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 from celery.schedules import crontab
+from dotenv import load_dotenv
+import os
+
+load_dotenv()   
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,12 +28,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6$za4$_0w46qv^^8gk!n7$59&_wp(cmo)kluey$3^4$ena8+ra'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-6$za4$_0w46qv^^8gk!n7$59&_wp(cmo)kluey$3^4$ena8+ra')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# CORS settings
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+CORS_ALLOW_CREDENTIALS = True
 
 
 # Application definition
@@ -159,14 +168,11 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
-from dotenv import load_dotenv
-import os
-
-load_dotenv()   
 
 
 # Email Configuration
 EMAIL_BACKEND = 'leads.email_backend.CustomEmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
@@ -174,8 +180,8 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@example.com')
 ATTORNEY_EMAIL = os.environ.get('ATTORNEY_EMAIL', 'attorney@example.com')
 
-# SSL  verification
-EMAIL_SSL_CERTVERIFY = True  
+# SSL verification
+EMAIL_SSL_CERTVERIFY = os.environ.get('EMAIL_SSL_CERTVERIFY', 'True') == 'True'
 
 
 # Celery Conf
@@ -196,3 +202,8 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=0, minute=0),  
     },
 }
+
+# File Upload Settings
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE

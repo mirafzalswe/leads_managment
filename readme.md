@@ -2,7 +2,7 @@
 
 A comprehensive Django-based application for managing prospective client leads. This system provides a public interface for prospects to submit their information along with internal tools for attorneys to manage and track leads through different stages of the client acquisition process.
 
-##  Features
+## 🚀 Features
 
 ### Public Features
 
@@ -18,8 +18,10 @@ A comprehensive Django-based application for managing prospective client leads. 
 - **Secure File Access**: Download and view uploaded resumes with proper authentication
 - **User Authentication**: Token-based authentication system for attorneys
 - **User Management**: Create and manage attorney accounts
+- **Asynchronous Task Processing**: Background tasks for email sending and file processing
+- **Real-time Monitoring**: Monitor task queues and system health
 
-##  System Architecture
+## 🏗️ System Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -44,20 +46,64 @@ A comprehensive Django-based application for managing prospective client leads. 
          │    │  Table  │  │  Table  │  │    Table    │   │
          │    └─────────┘  └─────────┘  └─────────────┘   │
          └─────────────────────────────────────────────────┘
+                                 │
+         ┌─────────────────────────────────────────────────┐
+         │              Celery Task Queue                 │
+         │    ┌─────────────┐  ┌─────────────┐            │
+         │    │  Workers    │  │  Beat       │            │
+         │    │  (Tasks)    │  │  (Scheduler)│            │
+         │    └─────────────┘  └─────────────┘            │
+         └─────────────────────────────────────────────────┘
+                                 │
+         ┌─────────────────────────────────────────────────┐
+         │              Redis Message Broker              │
+         │    ┌─────────────┐  ┌─────────────┐            │
+         │    │  Queue      │  │  Cache      │            │
+         │    │  (Tasks)    │  │  (Results)  │            │
+         │    └─────────────┘  └─────────────┘            │
+         └─────────────────────────────────────────────────┘
 ```
 
-##  Tech Stack
+## 🛠️ Tech Stack
 
 - **Backend**: Python 3.10, Django 4.2, Django REST Framework 3.14
 - **Database**: PostgreSQL 14
 - **Authentication**: Token-based authentication
 - **File Storage**: Django file handling with secure access
-- **Email**: Django email backend (configurable)
+- **Email**: Custom Django email backend with SSL handling
+- **Task Queue**: Celery 5.3.6 with Redis 7 as message broker
+- **Caching**: Redis for task results and general caching
 - **Containerization**: Docker & Docker Compose
 - **Testing**: pytest with Django integration
+- **Monitoring**: Health checks and Flower dashboard
 
+## 🔄 Celery Tasks
 
-## API Endpoints
+The application uses Celery for asynchronous task processing:
+
+- **Email Notifications**: 
+  - Sends confirmation emails to prospects
+  - Sends notification emails to attorneys
+  - Handles email delivery retries
+- **File Processing**: 
+  - Handles resume file uploads and processing
+  - Validates file formats
+  - Manages file storage
+- **Scheduled Tasks**: 
+  - Daily lead status reports
+  - Weekly summary emails
+  - Database maintenance tasks
+
+## 🏥 Health Checks
+
+The application includes health check endpoints for monitoring:
+
+- **API Health**: `http://localhost:8000/health/`
+- **Celery Worker Status**: Available through Flower dashboard
+- **Database Connection**: Monitored through Django's health check system
+- **Redis Connection**: Monitored through Celery health checks
+
+## 🔗 API Endpoints
 
 ### Public Endpoints (No Authentication Required)
 
@@ -84,22 +130,23 @@ A comprehensive Django-based application for managing prospective client leads. 
 | POST | `/api/auth/change-password/` | Change user password |
 | POST | `/api/auth/create-user/` | Create new user (admin only) |
 
-##  Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - Docker and Docker Compose installed
 - Git
+- Python 3.10 or higher (for local development)
 
 ### Installation
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/lead-management-app.git
-cd lead-management-app
+git clone https://github.com/mirafzalswe/leads_managment.git
+cd leads_managment
 ```
 
-2. **Environment Configuration (Optional)**
+2. **Environment Configuration**
 Create a `.env` file in the project root:
 ```env
 # Database
@@ -116,6 +163,14 @@ EMAIL_HOST_PASSWORD=your-app-password
 DEFAULT_FROM_EMAIL=noreply@yourcompany.com
 ATTORNEY_EMAIL=attorney@yourcompany.com
 
+# Redis Configuration
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# Celery Configuration
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+
 # Django
 SECRET_KEY=your-very-secure-secret-key-here
 DEBUG=False
@@ -126,160 +181,38 @@ DEBUG=False
 docker-compose up -d
 ```
 
-4. **Run database migrations**
+4. **Verify services are healthy**
+```bash
+curl http://localhost:8000/health/
+```
+
+5. **Run database migrations**
 ```bash
 docker-compose exec web python manage.py migrate
 ```
 
-5. **Create a superuser account**
+6. **Create a superuser account**
 ```bash
 docker-compose exec web python manage.py createsuperuser
 ```
 
-6. **Access the application**
+7. **Access the application**
 - API Base URL: http://localhost:8000/api/
 - Admin Panel: http://localhost:8000/admin/
-
-##  Usage Guide
-
-### For Prospects (Public Access)
-
-Submit a lead through the public API:
-```bash
-curl -X POST http://localhost:8000/api/leads/ \
-  -F "first_name=John" \
-  -F "last_name=Doe" \
-  -F "email=john.doe@example.com" \
-  -F "resume=@/path/to/resume.pdf"
-```
-
-### For Attorneys (Authentication Required)
-
-1. **Get an authentication token**
-```bash
-curl -X POST http://localhost:8000/api/auth/login/ \
-  -H "Content-Type: application/json" \
-  -d '{"username": "your_username", "password": "your_password"}'
-```
-
-2. **List all leads**
-```bash
-curl -X GET http://localhost:8000/api/leads/ \
-  -H "Authorization: Token YOUR_TOKEN_HERE"
-```
-
-3. **View a specific lead**
-```bash
-curl -X GET http://localhost:8000/api/leads/1/ \
-  -H "Authorization: Token YOUR_TOKEN_HERE"
-```
-
-4. **Update a lead's state**
-```bash
-curl -X PATCH http://localhost:8000/api/leads/1/ \
-  -H "Authorization: Token YOUR_TOKEN_HERE" \
-  -H "Content-Type: application/json" \
-  -d '{"state": "REACHED_OUT"}'
-```
-
-5. **Download a resume**
-```bash
-curl -X GET http://localhost:8000/api/leads/1/resume/ \
-  -H "Authorization: Token YOUR_TOKEN_HERE" \
-  -O -J
-```
-
-##  User Management
-
-### Creating Users
-
-#### Method 1: Django Admin Interface
-
-1. Login to http://localhost:8000/admin/
-2. Navigate to Users → Add User
-3. Fill in the required information
-
-#### Method 2: Command Line
-```bash
-docker-compose exec web python manage.py shell
-```
-```python
-from django.contrib.auth.models import User
-from rest_framework.authtoken.models import Token
-
-user = User.objects.create_user(
-    username='attorney1',
-    email='attorney1@example.com',
-    password='secure_password',
-    first_name='John',
-    last_name='Doe'
-)
-
-token = Token.objects.create(user=user)
-print(f"Token: {token.key}")
-```
-
-#### Method 3: API Endpoint (Admin Only)
-```bash
-curl -X POST http://localhost:8000/api/auth/create-user/ \
-  -H "Authorization: Token ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "attorney2",
-    "email": "attorney2@example.com",
-    "password": "secure_password",
-    "first_name": "Jane",
-    "last_name": "Smith",
-    "is_staff": false
-  }'
-```
-
-##  Testing
-
-Run the test suite:
-```bash
-# Run all tests
-docker-compose exec web python manage.py test
-
-# Run with coverage
-docker-compose exec web coverage run --source='.' manage.py test
-docker-compose exec web coverage report
-```
-
-Run specific test files:
-```bash
-# Test only the leads app
-docker-compose exec web python manage.py test leads
-
-# Test with pytest
-docker-compose exec web pytest
-```
+- Flower (Celery monitoring): http://localhost:5555/
 
 ## 📧 Email Configuration
 
-The application sends two types of emails:
+The application uses a custom email backend to handle SSL certificate issues:
 
-1. **Prospect Confirmation**: Sent to the prospect after successful submission
-2. **Attorney Notification**: Sent to the attorney when a new lead is submitted
-
-### Development Setup
-By default, emails are printed to the console. Check the Docker logs:
-```bash
-docker-compose logs web
-```
-
-### Production Setup
-Configure SMTP settings in your environment variables or settings.py:
 ```python
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-email@gmail.com'
-EMAIL_HOST_PASSWORD = 'your-app-password'
+# settings.py
+EMAIL_BACKEND = 'leads.email_backend.CustomEmailBackend'
 ```
 
-##  Security Features
+This backend automatically handles SSL certificate verification issues that may occur in development environments.
+
+## 🔒 Security Features
 
 - **Token-based Authentication**: Secure API access using DRF tokens
 - **File Upload Security**: Validates and securely stores uploaded files
@@ -287,8 +220,9 @@ EMAIL_HOST_PASSWORD = 'your-app-password'
 - **CSRF Protection**: Built-in Django CSRF protection
 - **SQL Injection Prevention**: Django ORM prevents SQL injection attacks
 - **Access Control**: Proper separation between public and private endpoints
+- **SSL/TLS**: Secure email communication with SSL/TLS support
 
-##  Production Deployment
+## 🚀 Production Deployment
 
 ### Environment Variables
 Set these environment variables for production:
@@ -311,9 +245,18 @@ EMAIL_HOST_USER=your-email
 EMAIL_HOST_PASSWORD=your-password
 DEFAULT_FROM_EMAIL=noreply@your-domain.com
 ATTORNEY_EMAIL=attorney@your-domain.com
+
+# Redis
+REDIS_HOST=your-redis-host
+REDIS_PORT=6379
+REDIS_PASSWORD=your-redis-password
+
+# Celery
+CELERY_BROKER_URL=redis://:your-redis-password@your-redis-host:6379/0
+CELERY_RESULT_BACKEND=redis://:your-redis-password@your-redis-host:6379/0
 ```
 
-##  API Response Examples
+## 📝 API Response Examples
 
 ### Lead Submission Response
 ```json
@@ -348,4 +291,58 @@ ATTORNEY_EMAIL=attorney@your-domain.com
   "username": "attorney1",
   "email": "attorney1@example.com"
 }
+```
+
+## 🔄 Asynchronous Tasks
+
+The application uses Celery for handling asynchronous tasks:
+
+### Email Tasks
+- Sending confirmation emails to prospects
+- Sending notification emails to attorneys
+- Bulk email operations
+- Email delivery retry mechanism
+
+### File Processing Tasks
+- Resume/CV processing and validation
+- File format conversion
+- File cleanup operations
+- Secure file storage management
+
+### Scheduled Tasks
+- Daily lead status reports
+- Weekly summary emails
+- Database maintenance tasks
+- System health checks
+
+### Monitoring Tasks
+- System health checks
+- Performance metrics collection
+- Error reporting
+- Task queue monitoring
+
+To monitor Celery tasks, you can use Flower:
+```bash
+docker-compose exec web celery -A lead_managment_app flower
+```
+
+## 🧪 Testing
+
+Run the test suite:
+```bash
+# Run all tests
+docker-compose exec web python manage.py test
+
+# Run with coverage
+docker-compose exec web coverage run --source='.' manage.py test
+docker-compose exec web coverage report
+```
+
+Run specific test files:
+```bash
+# Test only the leads app
+docker-compose exec web python manage.py test leads
+
+# Test with pytest
+docker-compose exec web pytest
 ```
