@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.conf import settings
 from django.http import FileResponse
 from .models import Lead
+from django.core.mail import send_mail
 from .serializers import (
     LeadCreateSerializer,
     LeadListSerializer,
@@ -37,21 +38,44 @@ class LeadViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         lead = serializer.save()
-
-        # self._send_prospect_email(lead
-        # self._send_attorney_email(lead) 
+        # ordinary version
+        self._send_prospect_email(lead)
+        self._send_attorney_email(lead) 
         # send_prospect_email_task.delay(lead.first_name, lead.email) 
         # send_attorney_email_task.delay(lead.first_name, lead.last_name, lead.email) 
 
         #  Celery version
-        lead_name = f"{lead.first_name} {lead.last_name}"
-        send_lead_confirmation_email.delay(lead.email, lead_name)
-        send_lead_notification_email.delay(lead.email, lead_name)
+        # lead_name = f"{lead.first_name} {lead.last_name}"
+        # send_lead_confirmation_email.delay(lead.email, lead_name)
+        # send_lead_notification_email.delay(lead.email, lead_name)
 
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-
+    def _send_prospect_email(self, lead):
+        """Send a confirmation email to the prospect."""
+        subject = 'Thank you for your submission'
+        message = f'Dear {lead.first_name},\n\nThank you for submitting your information. Our team will review your submission and contact you soon.\n\nBest regards,\nThe Team'
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [lead.email],
+            fail_silently=False,
+        )
+    
+    def _send_attorney_email(self, lead):
+        """Send a notification email to the attorney."""
+        subject = 'New Lead Submission'
+        message = f'A new lead has been submitted:\n\nName: {lead.first_name} {lead.last_name}\nEmail: {lead.email}\n\nPlease check the lead management system for more details.'
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [settings.ATTORNEY_EMAIL],
+            fail_silently=False,
+        )
+    
 
     @action(detail=True, methods=['get'])
     def resume(self, request, pk=None):
