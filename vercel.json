@@ -1,14 +1,16 @@
 {
-    "builds": [
-      {
-        "src": "lead_managment_app/wsgi.py",
-        "use": "@vercel/python"
-      }
-    ],
-    "routes": [
-      {
-        "src": "/(.*)",
-        "dest": "lead_managment_app/wsgi.py"
-      }
-    ]
-  }
+  "version": 2,
+  "builds": [
+    {
+      "src": "lead_managment_app/wsgi.py",
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "50mb" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "lead_managment_app/wsgi.py"
+    }
+  ]
+}

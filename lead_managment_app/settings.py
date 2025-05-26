@@ -10,7 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 
 """
-
+import dj_database_url
 import os
 from pathlib import Path
 from celery.schedules import crontab
@@ -99,10 +99,12 @@ DATABASES = {
         'NAME': os.environ.get('POSTGRES_DB', 'lead_management'),
         'USER': os.environ.get('POSTGRES_USER', 'postgres'),
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'db'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
+
+DATABASES["default"] = dj_database_url.parse("postgresql://postgres_qckq_user:0pxUVVBuwcW3ydna2FtEZJLL4dEl2eg8@dpg-d0q71vuuk2gs73aanucg-a.oregon-postgres.render.com/postgres_qckq")
 
 # DATABASES = {
 #     'default': {
